@@ -1,0 +1,27 @@
+{
+    "name": "aotd/platform-specific-installer",
+    "description": "A Composer plugin which installs packages, depends on processor architecture or operation system.",
+    "type": "composer-plugin",
+    "keywords": ["binaries", "os specific", "x64", "i386", "composer", "composer-plugin", "plugin"],
+    "license": "MIT",
+    "version": "1.0",
+    "authors": [
+        {
+            "name": "Alexey Ashurok",
+            "email": "me@aotd.ru",
+            "homepage": "https://aotd.ru"
+
+        }
+    ],
+    "autoload": {
+        "psr-0": {
+            "Aotd\\Composer\\PlatformSpecificInstaller\\": "src/"
+        }
+    },
+    "extra": {
+        "class": "Aotd\\Composer\\PlatformSpecificInstaller\\InstallerPlugin"
+    },
+    "require": {
+        "composer-plugin-api": "1.0.0"
+    }
+}
