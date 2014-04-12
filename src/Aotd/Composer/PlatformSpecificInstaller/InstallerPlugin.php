@@ -27,22 +27,23 @@ class InstallerPlugin implements PluginInterface, EventSubscriberInterface {
     {
         $this->composer = $composer;
         $this->io = $io;
+        $this->run();
     }
 
     public static function getSubscribedEvents()
     {
-        return array(
-            PluginEvents::COMMAND => 'run',
-        );
+//        return array(
+//            PluginEvents::COMMAND => 'run',
+//        );
     }
 
     /**
      * Operating system depended installation of packages
      */
-    public function run(CommandEvent $event)
+    public function run(/* CommandEvent $event */)
     {
-        if ( !in_array($event->getCommandName(), array('install', 'update')) )
-            return;
+//        if ( !in_array($event->getCommandName(), array('install', 'update')) )
+//            return;
 
         $extra = $this->composer->getPackage()->getExtra();
         if (empty($extra['platform-specific-require']))
@@ -60,7 +61,7 @@ class InstallerPlugin implements PluginInterface, EventSubscriberInterface {
             $this->io->write("\n  Unresolved platform-specific packages:");
             foreach ($unresolved as $name)
                 $this->io->write("    - $name");
-          $event->stopPropagation();
+//          $event->stopPropagation();
         }
 
     }
