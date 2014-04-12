@@ -25,6 +25,7 @@ class InstallerPlugin implements PluginInterface, EventSubscriberInterface {
 
     public function activate(Composer $composer, IOInterface $io)
     {
+        var_dump('Activate');
         $this->composer = $composer;
         $this->io = $io;
         $this->run();
@@ -68,6 +69,7 @@ class InstallerPlugin implements PluginInterface, EventSubscriberInterface {
 
     protected function tryInstall($variants)
     {
+        var_dump($variants);
         foreach ($variants as $variant) {
             if (!empty($variant['architecture']) && $variant['architecture'] !== self::getArchitecture())
                 continue;
