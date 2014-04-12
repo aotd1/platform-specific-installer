@@ -64,6 +64,7 @@ class InstallerPlugin implements PluginInterface, EventSubscriberInterface {
                 $this->io->write("    - $name");
 //          $event->stopPropagation();
         }
+        var_dump("all ok");
 
     }
 
