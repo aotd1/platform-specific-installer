@@ -70,6 +70,7 @@ class InstallerPlugin {
             $name = key($variant);
             $version = $variant[$name];
 
+            var_dump($name, $version);
             self::insertPackage(
                 self::$composer->getPackage(),
                 new Link($version, $name)
