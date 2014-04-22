@@ -10,62 +10,54 @@ use Composer\Plugin\PluginEvents;
 use Composer\Package\Link;
 use Composer\Package\RootPackageInterface;
 use Composer\Plugin\CommandEvent;
+use Composer\Script\Event;
+use Composer\Package\Package;
+use Composer\Package\Version\VersionParser;
 
-class InstallerPlugin implements PluginInterface, EventSubscriberInterface {
+
+class InstallerPlugin {
 
     /**
-     * @var Composer
+     * @var \Composer\Composer
      */
-    protected $composer;
+    public static $composer;
 
     /**
-     * @var IOInterface
+     * @var \Composer\IO\IOInterface
      */
-    protected $io;
+    public static $io;
 
-    public function activate(Composer $composer, IOInterface $io)
+    public static function getInstance($event)
     {
-        $this->composer = $composer;
-        $this->io = $io;
+        self::$composer = $event->getComposer();
+        self::$io = $event->getIO();
     }
 
-    public static function getSubscribedEvents()
+    public static function run(Event $event)
     {
-        return array(
-            PluginEvents::COMMAND => 'run',
-        );
-    }
+        self::getInstance($event);
+        $extra = self::$composer->getPackage()->getExtra();
 
-    /**
-     * Operating system depended installation of packages
-     */
-    public function run(CommandEvent $event)
-    {
-        if ( !in_array($event->getCommandName(), array('install', 'update')) )
-            return;
-
-        $extra = $this->composer->getPackage()->getExtra();
         if (empty($extra['platform-specific-require']))
             return;
 
         $unresolved = array();
         foreach ($extra['platform-specific-require'] as $name => $variants) {
-            if (!$this->tryInstall($variants)) {
+            if (!self::tryInstall($variants)) {
                 $unresolved[] = $name;
             }
         }
 
         if (!empty($unresolved)) {
-            $this->io->write('<error>Your requirements could not be resolved for current OS and/or processor architecture.</error>');
-            $this->io->write("\n  Unresolved platform-specific packages:");
+            self::$io->write('<error>Your requirements could not be resolved for current OS and/or processor architecture.</error>');
+            self::$io->write("\n  Unresolved platform-specific packages:");
             foreach ($unresolved as $name)
-                $this->io->write("    - $name");
-          $event->stopPropagation();
+                self::$io->write("    - $name");
+            $event->stopPropagation();
         }
-
     }
 
-    protected function tryInstall($variants)
+    protected static function tryInstall($variants)
     {
         foreach ($variants as $variant) {
             if (!empty($variant['architecture']) && $variant['architecture'] !== self::getArchitecture())
@@ -79,7 +71,7 @@ class InstallerPlugin implements PluginInterface, EventSubscriberInterface {
             $version = $variant[$name];
 
             self::insertPackage(
-                $this->composer->getPackage(),
+                self::$composer->getPackage(),
                 new Link($version, $name)
             );
             return true;
@@ -90,7 +82,9 @@ class InstallerPlugin implements PluginInterface, EventSubscriberInterface {
 
     protected static function insertPackage(RootPackageInterface $package, Link $link)
     {
-        $package->setRequires(array_merge($package->getRequires(), array($link)));
+        $downloadManager = self::$composer->getDownloadManager();
+        $downloadManager->download($package, $link->getTarget());
+        //$package->setRequires(array_merge($package->getRequires(), array($link)));
     }
 
     /**

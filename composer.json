@@ -18,9 +18,6 @@
             "Aotd\\Composer\\PlatformSpecificInstaller\\": "src/"
         }
     },
-    "extra": {
-        "class": "Aotd\\Composer\\PlatformSpecificInstaller\\InstallerPlugin"
-    },
     "require": {
         "composer-plugin-api": "1.0.0"
     }
