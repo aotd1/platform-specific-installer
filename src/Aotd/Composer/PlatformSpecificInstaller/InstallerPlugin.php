@@ -3,47 +3,62 @@
 namespace Aotd\Composer\PlatformSpecificInstaller;
 
 use Composer\Composer;
-use Composer\EventDispatcher\EventSubscriberInterface;
 use Composer\IO\IOInterface;
-use Composer\Plugin\PluginInterface;
-use Composer\Plugin\PluginEvents;
-use Composer\Package\Link;
-use Composer\Package\RootPackageInterface;
-use Composer\Plugin\CommandEvent;
+use Composer\Installer\InstallationManager;
+use Composer\DependencyResolver\Operation\InstallOperation;
+use Composer\Repository\WritableRepositoryInterface;
+use Composer\Package\PackageInterface;
 use Composer\Script\Event;
 use Composer\Package\Package;
-use Composer\Package\Version\VersionParser;
 
 
 class InstallerPlugin {
 
     /**
-     * @var \Composer\Composer
+     * @var Composer $composer
      */
     public static $composer;
 
     /**
-     * @var \Composer\IO\IOInterface
+     * @var IOInterface $io
      */
     public static $io;
 
-    public static function getInstance($event)
+    /**
+     * @var InstallationManager $installer
+     */
+    public static $installer;
+
+    /**
+     * @var WritableRepositoryInterface $localRepo
+     */
+    public static $localRepo;
+
+    /**
+     * @var Package[] platform-specific packages to install
+     */
+    public static $toInstall = array();
+
+    public static function init(Event $event)
     {
         self::$composer = $event->getComposer();
         self::$io = $event->getIO();
-    }
+        self::$installer = $event->getComposer()->getInstallationManager();
+        self::$localRepo = $event->getComposer()->getRepositoryManager()->getLocalRepository();
 
-    public static function run(Event $event)
-    {
-        self::getInstance($event);
+        //@TODO: refactor it all to use composer.lock file, to track updated platform-specific packages
+        self::$toInstall = array();
         $extra = self::$composer->getPackage()->getExtra();
 
         if (empty($extra['platform-specific-require']))
-            return;
+            return false;
 
         $unresolved = array();
         foreach ($extra['platform-specific-require'] as $name => $variants) {
-            if (!self::tryInstall($variants)) {
+            $package = self::createPlatformSpecificPackage($name, $variants);
+            if ($package) {
+                self::$toInstall[] = $package;
+            } else {
                 $unresolved[] = $name;
             }
         }
@@ -51,13 +66,49 @@ class InstallerPlugin {
         if (!empty($unresolved)) {
             self::$io->write('<error>Your requirements could not be resolved for current OS and/or processor architecture.</error>');
             self::$io->write("\n  Unresolved platform-specific packages:");
-            foreach ($unresolved as $name)
+            foreach ($unresolved as $name) {
                 self::$io->write("    - $name");
-            $event->stopPropagation();
+            }
+        }
+
+        return true;
+    }
+
+    public static function install(Event $event)
+    {
+
+        if (!self::init($event)) {
+            return;
+        }
+
+        $notInstalled = 0;
+        if (!empty(self::$toInstall)) {
+            self::$io->write('<info>Installing platform-specific dependencies</info>');
+            foreach (self::$toInstall as $package) {
+                if (!self::$installer->isPackageInstalled(self::$localRepo, $package)) {
+                    self::$installer->install(self::$localRepo, new InstallOperation($package));
+                } else {
+                    $notInstalled++;
+                }
+            }
+        }
+        if (empty(self::$toInstall) || $notInstalled > 0 ) {
+            self::$io->write('Nothing to install or update in platform-specific dependencies');
         }
     }
 
-    protected static function tryInstall($variants)
+    public static function update(Event $event)
+    {
+        //@TODO: update changed packages
+        self::install($event);
+    }
+
+    /**
+     * @param string $packageName
+     * @param array $variants
+     * @return null|Package
+     */
+    protected static function createPlatformSpecificPackage($packageName, $variants)
     {
         foreach ($variants as $variant) {
             if (!empty($variant['architecture']) && $variant['architecture'] !== self::getArchitecture())
@@ -70,22 +121,51 @@ class InstallerPlugin {
             $name = key($variant);
             $version = $variant[$name];
 
-            var_dump($name, $version);
-            self::insertPackage(
-                self::$composer->getPackage(),
-                new Link($version, $name)
-            );
-            return true;
+            return self::clonePackage($name, $version, $packageName);
         }
 
-        return false;
+        return null;
     }
 
-    protected static function insertPackage(RootPackageInterface $package, Link $link)
+    /**
+     * @param string $name
+     * @param string $version
+     * @param string $newName
+     * @return null|Package
+     */
+    protected static function clonePackage($name, $version, $newName)
     {
-        $downloadManager = self::$composer->getDownloadManager();
-        $downloadManager->download($package, $link->getTarget());
-        //$package->setRequires(array_merge($package->getRequires(), array($link)));
+        /* @var PackageInterface $package */
+        $package = self::$composer->getRepositoryManager()->findPackage($name, $version);
+        if (!$package) {
+            return null;
+        }
+        $cloned = new Package($newName, $package->getVersion(), $package->getPrettyVersion());
+        foreach ( self::getPackageClonedMethods() as $method) {
+            $cloned->{'set' . $method}($package->{'get' . $method}());
+        }
+        self::$localRepo->addPackage($cloned);
+        return $cloned;
+    }
+
+    /**
+     * @return string[]
+     */
+    private static function getPackageClonedMethods()
+    {
+        $methods = array();
+        $ignored = array('Id', 'Repository', 'TargetDir', 'ReleaseDate');
+        $reflection = new \ReflectionClass('\Composer\Package\Package');
+        foreach ($reflection->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
+            $name = substr($method->getName(), 3);
+            if ( strpos($method->getName(), 'get') === 0 && // is 'get' method
+                 $reflection->hasMethod('set'.$name) && // has 'set' method
+                 !in_array($name, $ignored) // not in stop list
+            ) {
+                $methods[] = $name;
+            }
+        }
+        return $methods;
     }
 
     /**

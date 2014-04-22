@@ -13,13 +13,13 @@
 
         }
     ],
+    "require": {
+        "ext-openssl": "*"
+    },
     "autoload": {
         "psr-0": {
             "Aotd\\Composer\\PlatformSpecificInstaller\\": "src/"
         }
-    },
-    "require": {
-        "composer-plugin-api": "1.0.0"
     },
     "stability": "stable"
 }
