@@ -4,7 +4,7 @@
     "type": "custom-installer",
     "keywords": ["binaries", "os specific", "x64", "i386", "composer", "composer-plugin", "plugin"],
     "license": "MIT",
-    "version": "1.0",
+    "version": "1.1",
     "authors": [
         {
             "name": "Alexey Ashurok",
